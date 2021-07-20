@@ -5,8 +5,16 @@ import esbuild from 'esbuild'
 const { resolve, join } = path
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
+/**
+ * @typedef {import('esbuild').BuildOptions} BuildOptions
+ */
 
-export default function () {
+/**
+ * @param {{
+ *   esbuild?: (defaultOptions: BuildOptions) => Promise<BuildOptions> | BuildOptions;
+ * }} [options]
+ **/
+export default function (options) {
 	/** @type {import('@sveltejs/kit').Adapter} */
 	const adapter = {
 		name: '@sveltejs/adapter-begin',
@@ -22,33 +30,29 @@ export default function () {
 
 			utils.log.minor('bundling server for lambda...');
 			utils.copy(join(files, 'entry.js'), '.svelte-kit/begin/entry.js');
-			await esbuild.build({
+
+
+			/** @type {BuildOptions} */
+			const defaultOptions = {
 				entryPoints: ['.svelte-kit/begin/entry.js'],
 				outfile: join('.begin', 'sveltekit-render', 'index.js'),
 				bundle: true,
+				inject: [join(files, 'shims.js')],
 				platform: 'node'
-			})
+			};
+
+			const buildOptions =
+				options && options.esbuild ? await options.esbuild(defaultOptions) : defaultOptions;
+
+			await esbuild.build(buildOptions);
 
 			
-			// writeFileSync(join('.begin', 'render', 'index.js'), `
-			// 'use strict';
-			// const handler= require('./entry-index.js')
-		  // module.exports= handler`)
-			// writeFileSync(join('.begin', 'render', 'package.json'), `{"type":"commonjs"}`)
-
-			//const { static: static_mount_point } = parse_arc('app.arc');
-
 			const static_directory = resolve('.begin','public');
-			const server_directory = resolve(join('.begin','shared'));
 
 			utils.log.minor('Writing client application...');
 			utils.copy_static_files(static_directory);
 			utils.copy_client_files(static_directory);
 
-
-			// utils.log.minor('Writing server application...');
-			// utils.copy_server_files(server_directory);
-			//writeFileSync(join('.begin','shared','.keep.js'),'//keep this', { flag: 'wx' })
 
 			utils.log.minor('Prerendering static pages...');
 			await utils.prerender({
