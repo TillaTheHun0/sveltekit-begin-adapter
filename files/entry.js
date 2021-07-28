@@ -20,7 +20,7 @@ export async function svelteHandler(event) {
 		method: httpMethod,
 		headers,
 		path,
-		body,
+		rawBody: body,
 		query
 	});
 
