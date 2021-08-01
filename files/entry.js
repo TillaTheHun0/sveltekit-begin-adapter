@@ -4,7 +4,8 @@ import url from 'url';
 import { init, render } from '../output/server/app.js'; // eslint-disable-line import/no-unresolved
 import arc from '@architect/functions'
 
-init();
+// arg pulled from .svelte-kit/output/app.js
+init({ paths: {"base":"","assets":"/."} });
 
 const checkStatic = arc.http.proxy({passthru:true})
 
