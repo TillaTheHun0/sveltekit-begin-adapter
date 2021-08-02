@@ -12,7 +12,7 @@ const checkStatic = arc.http.proxy({passthru:true})
 export const handler = arc.http.async(checkStatic,svelteHandler)
 
 export async function svelteHandler(event) {
-	const { host, rawPath: path, httpMethod, rawQueryString, headers, body } = event;
+	const { host, rawPath: path, httpMethod, cookies, rawQueryString, headers, body } = event;
 
 	// Shim for sveltekit's respond requiring content-type to be present 
 	contentTypeHeader = Object.keys(headers).find(key => key.toLowerCase() === 'content-type')
@@ -31,7 +31,10 @@ export async function svelteHandler(event) {
 	const rendered = await render({
 		host,
 		method: httpMethod,
-		headers,
+		headers: {
+			...(cookies ?  { cookie: cookies.join(';') } : {}),
+			...headers
+		},
 		path,
 		rawBody: body,
 		query
