@@ -13,6 +13,18 @@ export const handler = arc.http.async(checkStatic,svelteHandler)
 
 export async function svelteHandler(event) {
 	const { host, rawPath: path, httpMethod, rawQueryString, headers, body } = event;
+
+	// Shim for sveltekit's respond requiring content-type to be present 
+	contentTypeHeader = Object.keys(headers).find(key => key.toLowerCase() === 'content-type')
+	if (!contentTypeHeader) {
+		switch (httpMethod.toLowerCase()) {
+			case ('get'):
+				headers['content-type'] = 'text/html; charset=UTF-8';
+				break;
+			default:
+				headers['content-type'] = 'application/json'
+		}
+	}
 	
 	const query = new url.URLSearchParams(rawQueryString);
 
