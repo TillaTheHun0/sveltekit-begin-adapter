@@ -1,11 +1,15 @@
-'use strict';
+import { __fetch_polyfill } from '@sveltejs/kit/install-fetch';
 
 import url from 'url';
-import { init, render } from '../output/server/app.js'; // eslint-disable-line import/no-unresolved
 import arc from '@architect/functions'
 
-// arg pulled from .svelte-kit/output/app.js
-init({ paths: {"base":"","assets":"/."} });
+// TODO: should this use builder.getServerDirectory()?
+import { App } from '../output/server/app.js';
+import { manifest } from '../output/server/manifest.js';
+
+__fetch_polyfill()
+
+const app = new App(manifest);
 
 const checkStatic = arc.http.proxy({passthru:true})
 
@@ -28,7 +32,7 @@ export async function svelteHandler(event) {
 	
 	const query = new url.URLSearchParams(rawQueryString);
 
-	const rendered = await render({
+	const rendered = await app.render({
 		host,
 		method: httpMethod,
 		headers: {

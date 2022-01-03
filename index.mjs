@@ -19,17 +19,20 @@ export default function (options) {
 	const adapter = {
 		name: '@sveltejs/adapter-begin',
 
-		async adapt({ utils }) {
+		async adapt(builder) {
+			const tmp = builder.getBuildDirectory('begin-tmp')
+
+			builder.rimraf('.begin')
 			
 			const files = fileURLToPath(new URL('./files', import.meta.url))
-			utils.log.minor('verifying app.arc manifest exists');
+			builder.log.minor('verifying app.arc manifest exists');
 			if (!existsSync('app.arc')) {
-				utils.log.minor('adding architect manifest app.arc');
-				utils.copy(join(files, 'app.arc'), 'app.arc')
+				builder.log.minor('adding architect manifest app.arc');
+				builder.copy(join(files, 'app.arc'), 'app.arc')
 			}
 
-			utils.log.minor('bundling server for lambda...');
-			utils.copy(join(files, 'entry.js'), '.svelte-kit/begin/entry.js');
+			builder.log.minor('bundling server for lambda...');
+			builder.copy(join(files, 'entry.js'), '.svelte-kit/begin/entry.js');
 
 
 			/** @type {BuildOptions} */
@@ -46,16 +49,15 @@ export default function (options) {
 
 			await esbuild.build(buildOptions);
 
-			
 			const static_directory = resolve('.begin','public');
 
-			utils.log.minor('Writing client application...');
-			utils.copy_static_files(static_directory);
-			utils.copy_client_files(static_directory);
+			builder.log.minor('Writing client application...');
+			builder.writeStatic(static_directory);
+			builder.writeClient(static_directory);
 
 
-			utils.log.minor('Prerendering static pages...');
-			await utils.prerender({
+			builder.log.minor('Prerendering static pages...');
+			await builder.prerender({
 				dest: static_directory
 			});
 		}
