@@ -2,24 +2,22 @@
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
-var require$$3 = require('fs');
-var path = require('path');
+var require$$0 = require('fs');
+var require$$2 = require('path');
 var url = require('url');
-var require$$0 = require('child_process');
-var require$$1 = require('crypto');
-var require$$4 = require('os');
+var require$$1 = require('os');
+var require$$3 = require('child_process');
+var require$$4 = require('crypto');
 var require$$5 = require('tty');
-var require$$6 = require('worker_threads');
 
 function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
 
-var require$$3__default = /*#__PURE__*/_interopDefaultLegacy(require$$3);
-var path__default = /*#__PURE__*/_interopDefaultLegacy(path);
 var require$$0__default = /*#__PURE__*/_interopDefaultLegacy(require$$0);
+var require$$2__default = /*#__PURE__*/_interopDefaultLegacy(require$$2);
 var require$$1__default = /*#__PURE__*/_interopDefaultLegacy(require$$1);
+var require$$3__default = /*#__PURE__*/_interopDefaultLegacy(require$$3);
 var require$$4__default = /*#__PURE__*/_interopDefaultLegacy(require$$4);
 var require$$5__default = /*#__PURE__*/_interopDefaultLegacy(require$$5);
-var require$$6__default = /*#__PURE__*/_interopDefaultLegacy(require$$6);
 
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
@@ -56,6 +54,8 @@ var __export = (target, all) => {
 
 // lib/npm/node.ts
 __export(exports, {
+  analyzeMetafile: () => analyzeMetafile,
+  analyzeMetafileSync: () => analyzeMetafileSync,
   build: () => build,
   buildSync: () => buildSync,
   formatMessages: () => formatMessages,
@@ -303,7 +303,8 @@ function pushCommonFlags(flags, options, keys) {
   let minifyWhitespace = getFlag(options, keys, "minifyWhitespace", mustBeBoolean);
   let minifyIdentifiers = getFlag(options, keys, "minifyIdentifiers", mustBeBoolean);
   let charset = getFlag(options, keys, "charset", mustBeString);
-  let treeShaking = getFlag(options, keys, "treeShaking", mustBeStringOrBoolean);
+  let treeShaking = getFlag(options, keys, "treeShaking", mustBeBoolean);
+  let ignoreAnnotations = getFlag(options, keys, "ignoreAnnotations", mustBeBoolean);
   let jsx = getFlag(options, keys, "jsx", mustBeString);
   let jsxFactory = getFlag(options, keys, "jsxFactory", mustBeString);
   let jsxFragment = getFlag(options, keys, "jsxFragment", mustBeString);
@@ -336,8 +337,10 @@ function pushCommonFlags(flags, options, keys) {
     flags.push("--minify-identifiers");
   if (charset)
     flags.push(`--charset=${charset}`);
-  if (treeShaking !== void 0 && treeShaking !== true)
+  if (treeShaking !== void 0)
     flags.push(`--tree-shaking=${treeShaking}`);
+  if (ignoreAnnotations)
+    flags.push(`--ignore-annotations`);
   if (jsx)
     flags.push(`--jsx=${jsx}`);
   if (jsxFactory)
@@ -489,8 +492,8 @@ function flagsForBuildOptions(callName, options, isTTY2, logLevelDefault, writeD
     }
   }
   if (inject)
-    for (let path2 of inject)
-      flags.push(`--inject:${path2}`);
+    for (let path3 of inject)
+      flags.push(`--inject:${path3}`);
   if (loader) {
     for (let ext in loader) {
       if (ext.indexOf("=") >= 0)
@@ -719,8 +722,8 @@ function createChannel(streamIn) {
     if (isFirstPacket) {
       isFirstPacket = false;
       let binaryVersion = String.fromCharCode(...bytes);
-      if (binaryVersion !== "0.12.15") {
-        throw new Error(`Cannot start service: Host version "${"0.12.15"}" does not match binary version ${JSON.stringify(binaryVersion)}`);
+      if (binaryVersion !== "0.13.15") {
+        throw new Error(`Cannot start service: Host version "${"0.13.15"}" does not match binary version ${JSON.stringify(binaryVersion)}`);
       }
       return;
     }
@@ -852,7 +855,7 @@ function createChannel(streamIn) {
                   throw new Error(`Expected onResolve() callback in plugin ${JSON.stringify(name)} to return an object`);
                 let keys = {};
                 let pluginName = getFlag(result, keys, "pluginName", mustBeString);
-                let path2 = getFlag(result, keys, "path", mustBeString);
+                let path3 = getFlag(result, keys, "path", mustBeString);
                 let namespace = getFlag(result, keys, "namespace", mustBeString);
                 let external = getFlag(result, keys, "external", mustBeBoolean);
                 let sideEffects = getFlag(result, keys, "sideEffects", mustBeBoolean);
@@ -865,8 +868,8 @@ function createChannel(streamIn) {
                 response.id = id;
                 if (pluginName != null)
                   response.pluginName = pluginName;
-                if (path2 != null)
-                  response.path = path2;
+                if (path3 != null)
+                  response.path = path3;
                 if (namespace != null)
                   response.namespace = namespace;
                 if (external != null)
@@ -1035,7 +1038,7 @@ function createChannel(streamIn) {
       let flags = [];
       try {
         pushLogFlags(flags, options, {}, isTTY2, buildLogLevelDefault);
-      } catch (e2) {
+      } catch {
       }
       const message = extractErrorMessageV8(e, streamIn, details, note, pluginName);
       sendRequest(refs, { command: "error", flags, error: message }, () => {
@@ -1240,6 +1243,8 @@ function createChannel(streamIn) {
       throw new Error(`Cannot enable "write" in the browser`);
     if (incremental && streamIn.isSync)
       throw new Error(`Cannot use "incremental" with a synchronous build`);
+    if (watch && streamIn.isSync)
+      throw new Error(`Cannot use "watch" with a synchronous build`);
     sendRequest(refs, request, (error, response) => {
       if (error)
         return callback(new Error(error), null);
@@ -1266,7 +1271,7 @@ function createChannel(streamIn) {
       return buildResponseToResult(response, callback);
     });
   };
-  let transform2 = ({ callName, refs, input, options, isTTY: isTTY2, fs: fs2, callback }) => {
+  let transform2 = ({ callName, refs, input, options, isTTY: isTTY2, fs: fs3, callback }) => {
     const details = createObjectStash();
     let start = (inputPath) => {
       try {
@@ -1290,7 +1295,7 @@ function createChannel(streamIn) {
             return callback(failureErrorWithLog("Transform failed", errors, warnings), null);
           if (response.codeFS) {
             outstanding++;
-            fs2.readFile(response.code, (err, contents) => {
+            fs3.readFile(response.code, (err, contents) => {
               if (err !== null) {
                 callback(err, null);
               } else {
@@ -1301,7 +1306,7 @@ function createChannel(streamIn) {
           }
           if (response.mapFS) {
             outstanding++;
-            fs2.readFile(response.map, (err, contents) => {
+            fs3.readFile(response.map, (err, contents) => {
               if (err !== null) {
                 callback(err, null);
               } else {
@@ -1316,7 +1321,7 @@ function createChannel(streamIn) {
         let flags = [];
         try {
           pushLogFlags(flags, options, {}, isTTY2, transformLogLevelDefault);
-        } catch (e2) {
+        } catch {
         }
         const error = extractErrorMessageV8(e, streamIn, details, void 0, "");
         sendRequest(refs, { command: "error", flags, error }, () => {
@@ -1327,7 +1332,7 @@ function createChannel(streamIn) {
     };
     if (typeof input === "string" && input.length > 1024 * 1024) {
       let next = start;
-      start = () => fs2.writeFile(input, next);
+      start = () => fs3.writeFile(input, next);
     }
     start(null);
   };
@@ -1359,13 +1364,35 @@ function createChannel(streamIn) {
       callback(null, response.messages);
     });
   };
+  let analyzeMetafile2 = ({ callName, refs, metafile, options, callback }) => {
+    if (options === void 0)
+      options = {};
+    let keys = {};
+    let color = getFlag(options, keys, "color", mustBeBoolean);
+    let verbose = getFlag(options, keys, "verbose", mustBeBoolean);
+    checkForInvalidFlags(options, keys, `in ${callName}() call`);
+    let request = {
+      command: "analyze-metafile",
+      metafile
+    };
+    if (color !== void 0)
+      request.color = color;
+    if (verbose !== void 0)
+      request.verbose = verbose;
+    sendRequest(refs, request, (error, response) => {
+      if (error)
+        return callback(new Error(error), null);
+      callback(null, response.result);
+    });
+  };
   return {
     readFromStdout,
     afterClose,
     service: {
       buildOrServe,
       transform: transform2,
-      formatMessages: formatMessages2
+      formatMessages: formatMessages2,
+      analyzeMetafile: analyzeMetafile2
     }
   };
 }
@@ -1400,7 +1427,7 @@ function extractCallerV8(e, streamIn, ident) {
         note = { text: e.message, location };
         return note;
       }
-    } catch (e2) {
+    } catch {
     }
   };
 }
@@ -1409,11 +1436,11 @@ function extractErrorMessageV8(e, streamIn, stash, note, pluginName) {
   let location = null;
   try {
     text = (e && e.message || e) + "";
-  } catch (e2) {
+  } catch {
   }
   try {
     location = parseStackLinesV8(streamIn, (e.stack + "").split("\n"), "");
-  } catch (e2) {
+  } catch {
   }
   return { pluginName, text, location, notes: note ? [note] : [], detail: stash ? stash.store(e) : -1 };
 }
@@ -1441,7 +1468,7 @@ function parseStackLinesV8(streamIn, lines, ident) {
           let contents;
           try {
             contents = streamIn.readFileSync(match[1], "utf8");
-          } catch (e) {
+          } catch {
             break;
           }
           let lineText = contents.split(/\r\n|\r|\n|\u2028|\u2029/)[+match[2] - 1] || "";
@@ -1554,10 +1581,10 @@ function sanitizeStringArray(values, property) {
   }
   return result;
 }
-function convertOutputFiles({ path: path2, contents }) {
+function convertOutputFiles({ path: path3, contents }) {
   let text = null;
   return {
-    path: path2,
+    path: path3,
     contents,
     get text() {
       if (text === null)
@@ -1567,48 +1594,128 @@ function convertOutputFiles({ path: path2, contents }) {
   };
 }
 
+// lib/npm/node-platform.ts
+var fs = require$$0__default["default"];
+var os = require$$1__default["default"];
+var path = require$$2__default["default"];
+var ESBUILD_BINARY_PATH = process.env.ESBUILD_BINARY_PATH || ESBUILD_BINARY_PATH;
+var knownWindowsPackages = {
+  "win32 arm64 LE": "esbuild-windows-arm64",
+  "win32 ia32 LE": "esbuild-windows-32",
+  "win32 x64 LE": "esbuild-windows-64"
+};
+var knownUnixlikePackages = {
+  "android arm64 LE": "esbuild-android-arm64",
+  "darwin arm64 LE": "esbuild-darwin-arm64",
+  "darwin x64 LE": "esbuild-darwin-64",
+  "freebsd arm64 LE": "esbuild-freebsd-arm64",
+  "freebsd x64 LE": "esbuild-freebsd-64",
+  "linux arm LE": "esbuild-linux-arm",
+  "linux arm64 LE": "esbuild-linux-arm64",
+  "linux ia32 LE": "esbuild-linux-32",
+  "linux mips64el LE": "esbuild-linux-mips64le",
+  "linux ppc64 LE": "esbuild-linux-ppc64le",
+  "linux x64 LE": "esbuild-linux-64",
+  "netbsd x64 LE": "esbuild-netbsd-64",
+  "openbsd x64 LE": "esbuild-openbsd-64",
+  "sunos x64 LE": "esbuild-sunos-64"
+};
+function pkgAndSubpathForCurrentPlatform() {
+  let pkg;
+  let subpath;
+  let platformKey = `${process.platform} ${os.arch()} ${os.endianness()}`;
+  if (platformKey in knownWindowsPackages) {
+    pkg = knownWindowsPackages[platformKey];
+    subpath = "esbuild.exe";
+  } else if (platformKey in knownUnixlikePackages) {
+    pkg = knownUnixlikePackages[platformKey];
+    subpath = "bin/esbuild";
+  } else {
+    throw new Error(`Unsupported platform: ${platformKey}`);
+  }
+  return { pkg, subpath };
+}
+function downloadedBinPath(pkg, subpath) {
+  const esbuildLibDir = path.dirname(require.resolve("esbuild"));
+  return path.join(esbuildLibDir, `downloaded-${pkg}-${path.basename(subpath)}`);
+}
+function generateBinPath() {
+  if (ESBUILD_BINARY_PATH) {
+    return ESBUILD_BINARY_PATH;
+  }
+  const { pkg, subpath } = pkgAndSubpathForCurrentPlatform();
+  let binPath;
+  try {
+    binPath = require.resolve(`${pkg}/${subpath}`);
+  } catch (e) {
+    binPath = downloadedBinPath(pkg, subpath);
+    if (!fs.existsSync(binPath)) {
+      try {
+        require.resolve(pkg);
+      } catch {
+        throw new Error(`The package "${pkg}" could not be found, and is needed by esbuild.
+
+If you are installing esbuild with npm, make sure that you don't specify the
+"--no-optional" flag. The "optionalDependencies" package.json feature is used
+by esbuild to install the correct binary executable for your current platform.`);
+      }
+      throw e;
+    }
+  }
+  let isYarnPnP = false;
+  try {
+    require("pnpapi");
+    isYarnPnP = true;
+  } catch (e) {
+  }
+  if (isYarnPnP) {
+    const esbuildLibDir = path.dirname(require.resolve("esbuild"));
+    const binTargetPath = path.join(esbuildLibDir, `pnpapi-${pkg}-${path.basename(subpath)}`);
+    if (!fs.existsSync(binTargetPath)) {
+      fs.copyFileSync(binPath, binTargetPath);
+      fs.chmodSync(binTargetPath, 493);
+    }
+    return binTargetPath;
+  }
+  return binPath;
+}
+
 // lib/npm/node.ts
-var child_process = require$$0__default['default'];
-var crypto = require$$1__default['default'];
-var path = path__default['default'];
-var fs = require$$3__default['default'];
-var os = require$$4__default['default'];
-var tty = require$$5__default['default'];
+var child_process = require$$3__default["default"];
+var crypto = require$$4__default["default"];
+var path2 = require$$2__default["default"];
+var fs2 = require$$0__default["default"];
+var os2 = require$$1__default["default"];
+var tty = require$$5__default["default"];
 var worker_threads;
 if (process.env.ESBUILD_WORKER_THREADS !== "0") {
   try {
-    worker_threads = require$$6__default['default'];
-  } catch (e) {
+    worker_threads = require("worker_threads");
+  } catch {
+  }
+  let [major, minor] = process.versions.node.split(".");
+  if (+major < 12 || +major === 12 && +minor < 17 || +major === 13 && +minor < 13) {
+    worker_threads = void 0;
   }
 }
 var _a;
-var isInternalWorkerThread = ((_a = worker_threads == null ? void 0 : worker_threads.workerData) == null ? void 0 : _a.esbuildVersion) === "0.12.15";
+var isInternalWorkerThread = ((_a = worker_threads == null ? void 0 : worker_threads.workerData) == null ? void 0 : _a.esbuildVersion) === "0.13.15";
 var esbuildCommandAndArgs = () => {
-  if (process.env.ESBUILD_BINARY_PATH) {
-    return [path.resolve(process.env.ESBUILD_BINARY_PATH), []];
-  }
-  if (path.basename(__filename) !== "main.js" || path.basename(__dirname) !== "lib") {
+  if ((!ESBUILD_BINARY_PATH || false) && (path2.basename(__filename) !== "main.js" || path2.basename(__dirname) !== "lib")) {
     throw new Error(`The esbuild JavaScript API cannot be bundled. Please mark the "esbuild" package as external so it's not included in the bundle.
 
 More information: The file containing the code for esbuild's JavaScript API (${__filename}) does not appear to be inside the esbuild package on the file system, which usually means that the esbuild package was bundled into another file. This is problematic because the API needs to run a binary executable inside the esbuild package which is located using a relative path from the API code to the executable. If the esbuild package is bundled, the relative path will be incorrect and the executable won't be found.`);
   }
-  if (process.platform === "win32") {
-    return [path.join(__dirname, "..", "esbuild.exe"), []];
-  }
-  let pathForYarn2 = path.join(__dirname, "..", "esbuild");
-  if (fs.existsSync(pathForYarn2)) {
-    return [pathForYarn2, []];
-  }
-  return [path.join(__dirname, "..", "bin", "esbuild"), []];
+  return [generateBinPath(), []];
 };
 var isTTY = () => tty.isatty(2);
 var fsSync = {
   readFile(tempFile, callback) {
     try {
-      let contents = fs.readFileSync(tempFile, "utf8");
+      let contents = fs2.readFileSync(tempFile, "utf8");
       try {
-        fs.unlinkSync(tempFile);
-      } catch (e) {
+        fs2.unlinkSync(tempFile);
+      } catch {
       }
       callback(null, contents);
     } catch (err) {
@@ -1618,9 +1725,9 @@ var fsSync = {
   writeFile(contents, callback) {
     try {
       let tempFile = randomFileName();
-      fs.writeFileSync(tempFile, contents);
+      fs2.writeFileSync(tempFile, contents);
       callback(tempFile);
-    } catch (e) {
+    } catch {
       callback(null);
     }
   }
@@ -1628,10 +1735,10 @@ var fsSync = {
 var fsAsync = {
   readFile(tempFile, callback) {
     try {
-      fs.readFile(tempFile, "utf8", (err, contents) => {
+      fs2.readFile(tempFile, "utf8", (err, contents) => {
         try {
-          fs.unlink(tempFile, () => callback(err, contents));
-        } catch (e) {
+          fs2.unlink(tempFile, () => callback(err, contents));
+        } catch {
           callback(err, contents);
         }
       });
@@ -1642,17 +1749,18 @@ var fsAsync = {
   writeFile(contents, callback) {
     try {
       let tempFile = randomFileName();
-      fs.writeFile(tempFile, contents, (err) => err !== null ? callback(null) : callback(tempFile));
-    } catch (e) {
+      fs2.writeFile(tempFile, contents, (err) => err !== null ? callback(null) : callback(tempFile));
+    } catch {
       callback(null);
     }
   }
 };
-var version = "0.12.15";
+var version = "0.13.15";
 var build = (options) => ensureServiceIsRunning().build(options);
 var serve = (serveOptions, buildOptions) => ensureServiceIsRunning().serve(serveOptions, buildOptions);
 var transform = (input, options) => ensureServiceIsRunning().transform(input, options);
 var formatMessages = (messages, options) => ensureServiceIsRunning().formatMessages(messages, options);
+var analyzeMetafile = (messages, options) => ensureServiceIsRunning().analyzeMetafile(messages, options);
 var buildSync = (options) => {
   if (worker_threads && !isInternalWorkerThread) {
     if (!workerThreadService)
@@ -1717,6 +1825,26 @@ var formatMessagesSync = (messages, options) => {
   }));
   return result;
 };
+var analyzeMetafileSync = (metafile, options) => {
+  if (worker_threads && !isInternalWorkerThread) {
+    if (!workerThreadService)
+      workerThreadService = startWorkerThreadService(worker_threads);
+    return workerThreadService.analyzeMetafileSync(metafile, options);
+  }
+  let result;
+  runServiceSync((service) => service.analyzeMetafile({
+    callName: "analyzeMetafileSync",
+    refs: null,
+    metafile: typeof metafile === "string" ? metafile : JSON.stringify(metafile),
+    options,
+    callback: (err, res) => {
+      if (err)
+        throw err;
+      result = res;
+    }
+  }));
+  return result;
+};
 var initializeWasCalled = false;
 var initialize = (options) => {
   options = validateInitializeOptions(options || {});
@@ -1736,7 +1864,7 @@ var ensureServiceIsRunning = () => {
   if (longLivedService)
     return longLivedService;
   let [command, args] = esbuildCommandAndArgs();
-  let child = child_process.spawn(command, args.concat(`--service=${"0.12.15"}`, "--ping"), {
+  let child = child_process.spawn(command, args.concat(`--service=${"0.13.15"}`, "--ping"), {
     windowsHide: true,
     stdio: ["pipe", "pipe", "inherit"],
     cwd: defaultWD
@@ -1745,7 +1873,7 @@ var ensureServiceIsRunning = () => {
     writeToStdin(bytes) {
       child.stdin.write(bytes);
     },
-    readFileSync: fs.readFileSync,
+    readFileSync: fs2.readFileSync,
     isSync: false,
     isBrowser: false
   });
@@ -1817,6 +1945,15 @@ var ensureServiceIsRunning = () => {
         options,
         callback: (err, res) => err ? reject(err) : resolve(res)
       }));
+    },
+    analyzeMetafile: (metafile, options) => {
+      return new Promise((resolve, reject) => service.analyzeMetafile({
+        callName: "analyzeMetafile",
+        refs,
+        metafile: typeof metafile === "string" ? metafile : JSON.stringify(metafile),
+        options,
+        callback: (err, res) => err ? reject(err) : resolve(res)
+      }));
     }
   };
   return longLivedService;
@@ -1834,7 +1971,7 @@ var runServiceSync = (callback) => {
     isBrowser: false
   });
   callback(service);
-  let stdout = child_process.execFileSync(command, args.concat(`--service=${"0.12.15"}`), {
+  let stdout = child_process.execFileSync(command, args.concat(`--service=${"0.13.15"}`), {
     cwd: defaultWD,
     windowsHide: true,
     input: stdin,
@@ -1844,13 +1981,13 @@ var runServiceSync = (callback) => {
   afterClose();
 };
 var randomFileName = () => {
-  return path.join(os.tmpdir(), `esbuild-${crypto.randomBytes(32).toString("hex")}`);
+  return path2.join(os2.tmpdir(), `esbuild-${crypto.randomBytes(32).toString("hex")}`);
 };
 var workerThreadService = null;
 var startWorkerThreadService = (worker_threads2) => {
   let { port1: mainPort, port2: workerPort } = new worker_threads2.MessageChannel();
   let worker = new worker_threads2.Worker(__filename, {
-    workerData: { workerPort, defaultWD, esbuildVersion: "0.12.15" },
+    workerData: { workerPort, defaultWD, esbuildVersion: "0.13.15" },
     transferList: [workerPort],
     execArgv: []
   });
@@ -1868,10 +2005,13 @@ error: ${text}`);
       return;
     let plugins = options.plugins;
     let incremental = options.incremental;
+    let watch = options.watch;
     if (plugins && plugins.length > 0)
       throw fakeBuildError(`Cannot use plugins in synchronous API calls`);
     if (incremental)
       throw fakeBuildError(`Cannot use "incremental" with a synchronous build`);
+    if (watch)
+      throw fakeBuildError(`Cannot use "watch" with a synchronous build`);
   };
   let applyProperties = (object, properties) => {
     for (let key in properties) {
@@ -1907,6 +2047,9 @@ error: ${text}`);
     },
     formatMessagesSync(messages, options) {
       return runCallSync("formatMessages", [messages, options]);
+    },
+    analyzeMetafileSync(metafile, options) {
+      return runCallSync("analyzeMetafile", [metafile, options]);
     }
   };
 };
@@ -1929,14 +2072,21 @@ var startSyncServiceWorker = () => {
       let { sharedBuffer, id, command, args } = msg;
       let sharedBufferView = new Int32Array(sharedBuffer);
       try {
-        if (command === "build") {
-          workerPort.postMessage({ id, resolve: await service.build(args[0]) });
-        } else if (command === "transform") {
-          workerPort.postMessage({ id, resolve: await service.transform(args[0], args[1]) });
-        } else if (command === "formatMessages") {
-          workerPort.postMessage({ id, resolve: await service.formatMessages(args[0], args[1]) });
-        } else {
-          throw new Error(`Invalid command: ${command}`);
+        switch (command) {
+          case "build":
+            workerPort.postMessage({ id, resolve: await service.build(args[0]) });
+            break;
+          case "transform":
+            workerPort.postMessage({ id, resolve: await service.transform(args[0], args[1]) });
+            break;
+          case "formatMessages":
+            workerPort.postMessage({ id, resolve: await service.formatMessages(args[0], args[1]) });
+            break;
+          case "analyzeMetafile":
+            workerPort.postMessage({ id, resolve: await service.analyzeMetafile(args[0], args[1]) });
+            break;
+          default:
+            throw new Error(`Invalid command: ${command}`);
         }
       } catch (reject) {
         workerPort.postMessage({ id, reject, properties: extractProperties(reject) });
@@ -1953,8 +2103,10 @@ if (isInternalWorkerThread) {
 
 var esbuild = /*@__PURE__*/getDefaultExportFromCjs(main.exports);
 
-const { resolve, join } = path__default['default'];
-path__default['default'].dirname(new URL((typeof document === 'undefined' ? new (require('u' + 'rl').URL)('file:' + __filename).href : (document.currentScript && document.currentScript.src || new URL('index.cjs', document.baseURI).href))).pathname);
+const { resolve, join, relative } = require$$2__default["default"];
+
+const outDir = '.begin';
+const staticDir = resolve(outDir, 'public');
 
 /**
  * @typedef {import('esbuild').BuildOptions} BuildOptions
@@ -1966,54 +2118,74 @@ path__default['default'].dirname(new URL((typeof document === 'undefined' ? new 
  * }} [options]
  **/
 function index (options) {
-	/** @type {import('@sveltejs/kit').Adapter} */
-	const adapter = {
-		name: '@sveltejs/adapter-begin',
+  /** @type {import('@sveltejs/kit').Adapter} */
+  const adapter = {
+    name: '@sveltejs/adapter-begin',
 
-		async adapt({ utils }) {
-			
-			const files = url.fileURLToPath(new URL('./files', (typeof document === 'undefined' ? new (require('u' + 'rl').URL)('file:' + __filename).href : (document.currentScript && document.currentScript.src || new URL('index.cjs', document.baseURI).href))));
-			utils.log.minor('verifying app.arc manifest exists');
-			if (!require$$3.existsSync('app.arc')) {
-				utils.log.minor('adding architect manifest app.arc');
-				utils.copy(join(files, 'app.arc'), 'app.arc');
-			}
+    async adapt (builder) {
+      // a directory in sveltekit to place files ie. entrypoints for esbuild and shims
+      const entryDir = builder.getBuildDirectory('begin');
+      // Where sveltekit has built its output
+      const serverDir = relative(entryDir, builder.getServerDirectory());
 
-			utils.log.minor('bundling server for lambda...');
-			utils.copy(join(files, 'entry.js'), '.svelte-kit/begin/entry.js');
+      // clear out directories
+      builder.rimraf(outDir);
+      builder.rimraf(entryDir);
 
+      builder.log.minor('Prerendering static pages...');
+      await builder.prerender({
+        dest: staticDir
+      });
 
-			/** @type {BuildOptions} */
-			const defaultOptions = {
-				entryPoints: ['.svelte-kit/begin/entry.js'],
-				outfile: join('.begin', 'sveltekit-render', 'index.js'),
-				bundle: true,
-				inject: [join(files, 'shims.js')],
-				platform: 'node'
-			};
+      // files to copy into sveltekit ie. the lambda handler which is the entrypoint for esbuild
+      const files = url.fileURLToPath(new URL('./files', (typeof document === 'undefined' ? new (require('u' + 'rl').URL)('file:' + __filename).href : (document.currentScript && document.currentScript.src || new URL('index.cjs', document.baseURI).href))));
 
-			const buildOptions =
-				options && options.esbuild ? await options.esbuild(defaultOptions) : defaultOptions;
+      builder.log.minor('verifying app.arc manifest exists');
+      if (!require$$0.existsSync('app.arc')) {
+        builder.log.minor('adding architect manifest app.arc');
+        builder.copy(join(files, 'app.arc'), 'app.arc');
+      }
 
-			await esbuild.build(buildOptions);
+      builder.log.minor('bundling server for lambda...');
+      // copy esbuild entry point to build and bundle code
+      builder.copy(join(files, 'entry.js'), join(entryDir, 'entry.js'), {
+        replace: {
+          APP: join(serverDir, 'app.js'),
+          MANIFEST: './manifest.js'
+        }
+      });
 
-			
-			const static_directory = resolve('.begin','public');
+      builder.log.minor('generating manifest...');
+      // generate a manifest file
+      require$$0.writeFileSync(
+        join(entryDir, 'manifest.js'),
+        `export const manifest = ${builder.generateManifest({
+          relativePath: serverDir
+        })};\n`
+      );
 
-			utils.log.minor('Writing client application...');
-			utils.copy_static_files(static_directory);
-			utils.copy_client_files(static_directory);
+      /** @type {BuildOptions} */
+      const defaultOptions = {
+        entryPoints: [join(entryDir, 'entry.js')],
+        outfile: join(outDir, 'sveltekit-render', 'index.js'),
+        bundle: true,
+        inject: [join(files, 'shims.js')],
+        platform: 'node'
+      };
 
+      const buildOptions =
+        options && options.esbuild ? await options.esbuild(defaultOptions) : defaultOptions;
 
-			utils.log.minor('Prerendering static pages...');
-			await utils.prerender({
-				dest: static_directory
-			});
-		}
-	};
+      await esbuild.build(buildOptions);
 
-	return adapter;
+      builder.log.minor('Writing client application...');
+      builder.writeStatic(staticDir);
+      builder.writeClient(staticDir);
+    }
+  };
+
+  return adapter
 }
 
-exports.default = index;
+exports["default"] = index;
 //# sourceMappingURL=index.cjs.map

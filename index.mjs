@@ -1,9 +1,12 @@
-import { readFileSync, existsSync,writeFileSync } from 'fs';
-import path from 'path';
+import { existsSync, writeFileSync } from 'fs'
+import path from 'path'
 import { fileURLToPath } from 'url'
 import esbuild from 'esbuild'
-const { resolve, join } = path
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
+
+const { resolve, join, relative } = path
+
+const outDir = '.begin'
+const staticDir = resolve(outDir, 'public')
 
 /**
  * @typedef {import('esbuild').BuildOptions} BuildOptions
@@ -15,53 +18,71 @@ const __dirname = path.dirname(new URL(import.meta.url).pathname);
  * }} [options]
  **/
 export default function (options) {
-	/** @type {import('@sveltejs/kit').Adapter} */
-	const adapter = {
-		name: '@sveltejs/adapter-begin',
+  /** @type {import('@sveltejs/kit').Adapter} */
+  const adapter = {
+    name: '@sveltejs/adapter-begin',
 
-		async adapt(builder) {
-			const tmp = builder.getBuildDirectory('begin-tmp')
+    async adapt (builder) {
+      // a directory in sveltekit to place files ie. entrypoints for esbuild and shims
+      const entryDir = builder.getBuildDirectory('begin')
+      // Where sveltekit has built its output
+      const serverDir = relative(entryDir, builder.getServerDirectory())
 
-			builder.rimraf('.begin')
-			
-			const files = fileURLToPath(new URL('./files', import.meta.url))
-			builder.log.minor('verifying app.arc manifest exists');
-			if (!existsSync('app.arc')) {
-				builder.log.minor('adding architect manifest app.arc');
-				builder.copy(join(files, 'app.arc'), 'app.arc')
-			}
+      // clear out directories
+      builder.rimraf(outDir)
+      builder.rimraf(entryDir)
 
-			builder.log.minor('bundling server for lambda...');
-			builder.copy(join(files, 'entry.js'), '.svelte-kit/begin/entry.js');
+      builder.log.minor('Prerendering static pages...')
+      await builder.prerender({
+        dest: staticDir
+      })
 
+      // files to copy into sveltekit ie. the lambda handler which is the entrypoint for esbuild
+      const files = fileURLToPath(new URL('./files', import.meta.url))
 
-			/** @type {BuildOptions} */
-			const defaultOptions = {
-				entryPoints: ['.svelte-kit/begin/entry.js'],
-				outfile: join('.begin', 'sveltekit-render', 'index.js'),
-				bundle: true,
-				inject: [join(files, 'shims.js')],
-				platform: 'node'
-			};
+      builder.log.minor('verifying app.arc manifest exists')
+      if (!existsSync('app.arc')) {
+        builder.log.minor('adding architect manifest app.arc')
+        builder.copy(join(files, 'app.arc'), 'app.arc')
+      }
 
-			const buildOptions =
-				options && options.esbuild ? await options.esbuild(defaultOptions) : defaultOptions;
+      builder.log.minor('bundling server for lambda...')
+      // copy esbuild entry point to build and bundle code
+      builder.copy(join(files, 'entry.js'), join(entryDir, 'entry.js'), {
+        replace: {
+          APP: join(serverDir, 'app.js'),
+          MANIFEST: './manifest.js'
+        }
+      })
 
-			await esbuild.build(buildOptions);
+      builder.log.minor('generating manifest...')
+      // generate a manifest file
+      writeFileSync(
+        join(entryDir, 'manifest.js'),
+        `export const manifest = ${builder.generateManifest({
+          relativePath: serverDir
+        })};\n`
+      )
 
-			const static_directory = resolve('.begin','public');
+      /** @type {BuildOptions} */
+      const defaultOptions = {
+        entryPoints: [join(entryDir, 'entry.js')],
+        outfile: join(outDir, 'sveltekit-render', 'index.js'),
+        bundle: true,
+        inject: [join(files, 'shims.js')],
+        platform: 'node'
+      }
 
-			builder.log.minor('Writing client application...');
-			builder.writeStatic(static_directory);
-			builder.writeClient(static_directory);
+      const buildOptions =
+        options && options.esbuild ? await options.esbuild(defaultOptions) : defaultOptions
 
+      await esbuild.build(buildOptions)
 
-			builder.log.minor('Prerendering static pages...');
-			await builder.prerender({
-				dest: static_directory
-			});
-		}
-	};
+      builder.log.minor('Writing client application...')
+      builder.writeStatic(staticDir)
+      builder.writeClient(staticDir)
+    }
+  }
 
-	return adapter;
+  return adapter
 }

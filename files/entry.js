@@ -1,62 +1,58 @@
-import { __fetch_polyfill } from '@sveltejs/kit/install-fetch';
-
-import url from 'url';
 import arc from '@architect/functions'
+import asap from '@architect/asap'
 
-// TODO: should this use builder.getServerDirectory()?
-import { App } from '../output/server/app.js';
-import { manifest } from '../output/server/manifest.js';
+import { App } from 'APP'
+import { manifest } from 'MANIFEST'
 
-__fetch_polyfill()
+const app = new App(manifest)
 
-const app = new App(manifest);
+const checkStatic = asap({ passthru: true })
 
-const checkStatic = arc.http.proxy({passthru:true})
+export const handler = arc.http.async(checkStatic, svelteHandler)
 
-export const handler = arc.http.async(checkStatic,svelteHandler)
+export async function svelteHandler (event) {
+  const { rawPath, httpMethod, cookies, rawQueryString, headers, body, isBase64Encoded } = event
 
-export async function svelteHandler(event) {
-	const { host, rawPath: path, httpMethod, cookies, rawQueryString, headers, body } = event;
+  // Shim for sveltekit's respond requiring content-type to be present
+  const contentTypeHeader = Object.keys(headers).find(key => key.toLowerCase() === 'content-type')
+  if (!contentTypeHeader) {
+    switch (httpMethod.toLowerCase()) {
+      case ('get'):
+        headers['content-type'] = 'text/html; charset=UTF-8'
+        break
+      default:
+        headers['content-type'] = 'application/json'
+    }
+  }
 
-	// Shim for sveltekit's respond requiring content-type to be present 
-	contentTypeHeader = Object.keys(headers).find(key => key.toLowerCase() === 'content-type')
-	if (!contentTypeHeader) {
-		switch (httpMethod.toLowerCase()) {
-			case ('get'):
-				headers['content-type'] = 'text/html; charset=UTF-8';
-				break;
-			default:
-				headers['content-type'] = 'application/json'
-		}
-	}
-	
-	const query = new url.URLSearchParams(rawQueryString);
+  const encoding = isBase64Encoded ? 'base64' : headers['content-encoding'] || 'utf-8'
+  const rawBody = typeof body === 'string'
+    ? Buffer.from(body, encoding)
+    : typeof body === 'object'
+      ? Buffer.from(JSON.stringify(body), encoding)
+      : body
 
-	const rendered = await app.render({
-		host,
-		method: httpMethod,
-		headers: {
-			...(cookies ?  { cookie: cookies.join(';') } : {}),
-			...headers
-		},
-		path,
-		rawBody: body,
-		query
-	});
+  const rendered = await app.render({
+    url: `${rawPath}?${rawQueryString}`,
+    method: httpMethod,
+    headers: {
+      ...(cookies ? { cookie: cookies.join(';') } : {}),
+      ...headers
+    },
+    rawBody
+  })
 
-	if (rendered) {
-		return {
-			isBase64Encoded: false,
-			statusCode: rendered.status,
-			headers: rendered.headers,
-			body: rendered.body
-		};
-	}
+  if (rendered) {
+    return {
+      isBase64Encoded: false,
+      statusCode: rendered.status,
+      headers: rendered.headers,
+      body: rendered.body
+    }
+  }
 
-	return {
-		statusCode: 404,
-		body: 'Not Found'
-	};
+  return {
+    statusCode: 404,
+    body: 'Not Found'
+  }
 }
-
-
