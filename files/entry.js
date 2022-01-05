@@ -12,7 +12,7 @@ const checkStatic = arc.http.proxy({passthru:true})
 export const handler = arc.http.async(checkStatic,svelteHandler)
 
 export async function svelteHandler(event) {
-	const { host, rawPath: path, httpMethod, cookies, rawQueryString, headers, body } = event;
+	const { host, rawPath: path, httpMethod, cookies, rawQueryString, headers, body, isBase64Encoded } = event;
 
 	// Shim for sveltekit's respond requiring content-type to be present 
 	contentTypeHeader = Object.keys(headers).find(key => key.toLowerCase() === 'content-type')
@@ -27,6 +27,12 @@ export async function svelteHandler(event) {
 	}
 	
 	const query = new url.URLSearchParams(rawQueryString);
+  const encoding = isBase64Encoded ? 'base64' : headers['content-encoding'] || 'utf-8'
+  const rawBody = typeof body === 'string'
+    ? Buffer.from(body, encoding)
+    : typeof body === 'object'
+      ? Buffer.from(JSON.stringify(body), encoding)
+      : body
 
 	const rendered = await render({
 		host,
@@ -36,7 +42,7 @@ export async function svelteHandler(event) {
 			...headers
 		},
 		path,
-		rawBody: body,
+		rawBody,
 		query
 	});
 
