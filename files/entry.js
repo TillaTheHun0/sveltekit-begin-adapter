@@ -3,16 +3,19 @@
 import url from 'url';
 import { init, render } from '../output/server/app.js'; // eslint-disable-line import/no-unresolved
 import arc from '@architect/functions'
+import asap from '@architect/asap'
 
 // arg pulled from .svelte-kit/output/app.js
-init({ paths: {"base":"","assets":"/."} });
+init({ paths: { base: "", assets: "/." } });
 
-const checkStatic = arc.http.proxy({passthru:true})
+export const handler = async function (request, context) {
+	// add a rawBody onto the request
+	request.rawBody = request.body
+	return arc.http.async(asap({ passthru: true }), svelteHandler)(request, context)
+}
 
-export const handler = arc.http.async(checkStatic,svelteHandler)
-
-export async function svelteHandler(event) {
-	const { host, rawPath: path, httpMethod, cookies, rawQueryString, headers, body } = event;
+async function svelteHandler(event) {
+	const { host, rawPath: path, httpMethod, cookies, rawQueryString, headers, rawBody } = event;
 
 	// Shim for sveltekit's respond requiring content-type to be present 
 	contentTypeHeader = Object.keys(headers).find(key => key.toLowerCase() === 'content-type')
@@ -36,7 +39,8 @@ export async function svelteHandler(event) {
 			...headers
 		},
 		path,
-		rawBody: body,
+		rawBody,
+		raw: rawBody,
 		query
 	});
 

@@ -17,7 +17,8 @@
 		"index.cjs.map"
 	],
 	"dependencies": {
-		"@architect/functions": "^3.14.2"
+		"@architect/asap": "^4.1.0",
+		"@architect/functions": "^4.1.1"
 	},
 	"devDependencies": {
 		"@rollup/plugin-commonjs": "^19.0.1",
