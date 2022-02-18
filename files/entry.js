@@ -18,7 +18,7 @@ async function svelteHandler(event) {
 	const { host, rawPath: path, httpMethod, cookies, rawQueryString, headers, rawBody } = event;
 
 	// Shim for sveltekit's respond requiring content-type to be present 
-	contentTypeHeader = Object.keys(headers).find(key => key.toLowerCase() === 'content-type')
+	const contentTypeHeader = Object.keys(headers).find(key => key.toLowerCase() === 'content-type')
 	if (!contentTypeHeader) {
 		switch (httpMethod.toLowerCase()) {
 			case ('get'):
