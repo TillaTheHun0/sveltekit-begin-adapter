@@ -8,11 +8,7 @@ import asap from '@architect/asap'
 // arg pulled from .svelte-kit/output/app.js
 init({ paths: { base: "", assets: "/." } });
 
-export const handler = async function (request, context) {
-	// add a rawBody onto the request
-	request.rawBody = request.body
-	return arc.http.async(asap({ passthru: true }), svelteHandler)(request, context)
-}
+export const handler = arc.http.async(asap({ passthru: true }), svelteHandler)
 
 async function svelteHandler(event) {
 	const { host, rawPath: path, httpMethod, cookies, rawQueryString, headers, rawBody } = event;
