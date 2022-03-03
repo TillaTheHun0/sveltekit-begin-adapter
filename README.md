@@ -4,12 +4,12 @@ Adapter for Svelte apps that creates a [Begin](https://begin.com/) app, using a 
 
 ## Configuration
 
-run `npm install @ryanbethel/sveltekit-begin-adapter --save-dev`.
+run `npm install @tillathehun0/sveltekit-begin-adapter --save-dev`.
 
 Then add the adapter to your `svelte.config.js`:
 
 ```js
-import begin from '@ryanbethel/sveltekit-begin-adapter';
+import begin from '@tillathehun0/sveltekit-begin-adapter';
 
 export default {
 	kit: {
